@@ -67,7 +67,7 @@ def create_gate():
     tube_below_length = SCREEN_HEIGHT - GROUND_HEIGHT - tube_below_top
 
     # Calcul pour le tube du haut
-    min_gap = BIRD_HEIGHT
+    min_gap = BIRD_HEIGHT + 50
     max_gap = 150
     gap = randint(min_gap, max_gap)
 
