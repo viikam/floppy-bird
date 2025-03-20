@@ -29,6 +29,10 @@ TUBE_BELOW = pygame.image.load("assets/pipe-green.png")
 TUBE_ABOVE = pygame.image.load("assets/pipe-green-above.png")
 TUBE_WIDTH, TUBE_HEIGHT = TUBE_ABOVE.get_size()
 
+# Charger les images des chiffres
+DIGITS = [pygame.image.load(f"assets/{i}.png") for i in range(10)]
+DIGIT_WIDTH, DIGIT_HEIGHT = DIGITS[0].get_size()  
+
 # Position et vitesse de l'oiseau
 bird_x = 0
 bird_y = 0
@@ -50,7 +54,10 @@ MAX_BELOW_TOP = SCREEN_HEIGHT - GROUND_HEIGHT - MIN_TUBE_LENGTH
 ground_scroll_speed = 5
 
 # Intervalle entre les tuyaux (en frames)
-tube_spawn_delay = 40  # Un nouveau couple de tuyaux est créé toutes les 40 images
+tube_spawn_delay = 40  
+
+# Score
+score = 0
 
 def create_gate():
     """ Crée une nouvelle paire de tuyaux avec la même logique pour le haut et le bas.
@@ -58,7 +65,7 @@ def create_gate():
         pour que le prochain apparaisse exactement tube_spawn_delay frames après le précédent. """
     # Calcul de la position x pour le nouveau couple :
     if tube_list_below:
-        new_x = tube_list_below[-1].x + ground_scroll_speed * tube_spawn_delay
+        new_x = tube_list_below[-1]["rect"].x + ground_scroll_speed * tube_spawn_delay
     else:
         new_x = SCREEN_WIDTH
 
@@ -71,44 +78,51 @@ def create_gate():
     max_gap = 150
     gap = randint(min_gap, max_gap)
 
-    tube_above_bottom = tube_below_top - gap  # Position Y du bas du tuyau du haut
-    tube_above_top = tube_above_bottom - TUBE_HEIGHT  # Position du haut
-    tube_above_length = TUBE_HEIGHT  # On garde TUBE_HEIGHT comme hauteur
+    tube_above_bottom = tube_below_top - gap  
+    tube_above_top = tube_above_bottom - TUBE_HEIGHT  
+    tube_above_length = TUBE_HEIGHT 
 
-    tube_list_below.append(pygame.Rect(new_x, tube_below_top, TUBE_WIDTH, tube_below_length))
-    tube_list_above.append(pygame.Rect(new_x, tube_above_top, TUBE_WIDTH, tube_above_length))
+    # Création des tuyaux avec un attribut "passed"
+    tube_below = {
+        "rect": pygame.Rect(new_x, tube_below_top, TUBE_WIDTH, tube_below_length),
+        "passed": False
+    }
+    tube_above = {
+        "rect": pygame.Rect(new_x, tube_above_top, TUBE_WIDTH, tube_above_length),
+        "passed": False
+    }
 
-    # Debug: affichage des dimensions et position
-    print(f"Tuyau bas - X: {new_x}, Y: {tube_below_top}, Hauteur: {tube_below_length}")
-    print(f"Tuyau haut - X: {new_x}, Y: {tube_above_top}, Hauteur: {tube_above_length}")
+    tube_list_below.append(tube_below)
+    tube_list_above.append(tube_above)
 
 def update_tube_bas():
     """ Déplace et affiche les tuyaux du bas """
     for tube in tube_list_below:
-        tube.move_ip(-ground_scroll_speed, 0)
-        screen.blit(TUBE_BELOW, (tube.left, tube.top))
+        tube["rect"].move_ip(-ground_scroll_speed, 0)
+        screen.blit(TUBE_BELOW, (tube["rect"].left, tube["rect"].top))
     # Supprime le premier tuyau s'il est hors écran
-    if tube_list_below and tube_list_below[0].right < 0:
+    if tube_list_below and tube_list_below[0]["rect"].right < 0:
         tube_list_below.pop(0)
 
 def update_tube_haut():
     """ Déplace et affiche les tuyaux du haut """
     for tube in tube_list_above:
-        tube.move_ip(-ground_scroll_speed, 0)
-        screen.blit(TUBE_ABOVE, (tube.left, tube.top))
+        tube["rect"].move_ip(-ground_scroll_speed, 0)
+        screen.blit(TUBE_ABOVE, (tube["rect"].left, tube["rect"].top))
     # Supprime le premier tuyau s'il est hors écran
-    if tube_list_above and tube_list_above[0].right < 0:
+    if tube_list_above and tube_list_above[0]["rect"].right < 0:
         tube_list_above.pop(0)
 
 def restart():
     """ Réinitialise le jeu """
-    global bird_y, bird_x, bird_s, tube_list_below, tube_list_above, tube_timer
+    global bird_y, bird_x, bird_s, tube_list_below, tube_list_above, tube_timer, score
     bird_x = (SCREEN_WIDTH - BIRD_WIDTH) // 2
     bird_y = (SCREEN_HEIGHT - GROUND_HEIGHT) // 2
     bird_s = 0
     tube_list_below = []
     tube_list_above = []
     tube_timer = 0
+    score = 0
     create_gate()
 
 ground_pos = 0
@@ -134,6 +148,7 @@ def update_bird():
 
 def check_alive():
     """ Vérifie si l'oiseau est encore en vie """
+    global score
     bird_rect = pygame.Rect(bird_x, bird_y, BIRD_WIDTH, BIRD_HEIGHT)
 
     if bird_y + BIRD_HEIGHT >= SCREEN_HEIGHT - GROUND_HEIGHT:
@@ -141,12 +156,31 @@ def check_alive():
         return False
 
     for tube in tube_list_below + tube_list_above:
-        if bird_rect.colliderect(tube):
-            print(f"Collision avec un tube à {tube.left}, {tube.top}")  # Debug
+        if bird_rect.colliderect(tube["rect"]):
             HIT_SOUND.play()
             return False
 
+    # Vérifie si l'oiseau a passé une gate
+    for tube in tube_list_below:
+        if tube["rect"].right < bird_x and not tube["passed"]:
+            tube["passed"] = True
+            score += 1
+
     return True
+
+def draw_score():
+    """ Affiche le score à l'écran en utilisant les images des chiffres """
+    score_str = str(score)  
+    total_width = len(score_str) * DIGIT_WIDTH  
+
+    # Position de départ pour afficher le score (centré en haut de l'écran)
+    start_x = (SCREEN_WIDTH - total_width) // 2
+    start_y = 50
+
+    # Afficher chaque chiffre
+    for i, digit_char in enumerate(score_str):
+        digit_image = DIGITS[int(digit_char)] 
+        screen.blit(digit_image, (start_x + i * DIGIT_WIDTH, start_y))
 
 # Création de la fenêtre
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -185,6 +219,7 @@ while go:
             tube_timer = 0
 
         alive = check_alive()
+        draw_score()  # Affiche le score
         pygame.display.update()
 
     clock.tick(FPS)
